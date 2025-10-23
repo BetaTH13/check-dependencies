@@ -9,7 +9,7 @@
         "allowJs": false,
         "checkJs": false,
         "forceConsistentCasingInFileNames": true,
-        "types": ["vitest/globals"],
+        "types": ["vitest/globals", "node"],
         "importHelpers": false
     },
     "include": ["src/**/*", "test/**/*"],

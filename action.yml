@@ -1,0 +1,24 @@
+name: check-dependencies
+description: Check if new dependencies were added to a file
+author: BetaTH13
+
+inputs:
+  token:
+    description: 'GitHub token to use for authentication'
+    required: true
+  files:
+    description: 'Comma-separated list of files to check for new dependencies'
+    required: true
+  should_block_pr:
+    description: 'Whether to block the PR if new dependencies are found (true/false)'
+    required: false
+    default: 'false'
+
+  
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  color: 'blue'
+  icon: 'alert-circle'
