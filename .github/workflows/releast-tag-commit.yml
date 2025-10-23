@@ -1,0 +1,25 @@
+name: Release Tag Commit for Merge and PR
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-tag-commit:
+    name: Release Tag Commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Release Tag Commit
+        uses: BetaTH13/release-tag-commit@ab2519ac2c729d5e862f28ecfcb412a1a851be8f
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          create_release: 'true'
+          mark_release_as_latest: 'true'
+          generate_release_notes: 'true'
+          comment_pr: 'true'

@@ -1,0 +1,22 @@
+name: Check dependencies
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check Dependencies
+        uses: ./
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files_to_check: 'package.json,requirements.txt,README.md,example.yml'
