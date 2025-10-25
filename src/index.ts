@@ -22,8 +22,10 @@ export async function run() {
             return;
         }
 
-        
+        const changedFiles = await octokit.rest.pulls.listFiles({owner, repo, pull_number: pr.number});
+        const changedFileNames = changedFiles.data.map(file => file.filename);
 
+        core.info(`Changed files in PR #${pr.number}: ${changedFileNames.join(", ")}`);
 
     } catch (error: any) {
         core.setFailed(error.message);
