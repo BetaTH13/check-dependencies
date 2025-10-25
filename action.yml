@@ -6,13 +6,14 @@ inputs:
   token:
     description: 'GitHub token to use for authentication'
     required: true
-  files:
+  files_to_check:
     description: 'Comma-separated list of files to check for new dependencies'
     required: true
-  should_block_pr:
-    description: 'Whether to block the PR if new dependencies are found (true/false)'
+  label_name:
+    description: 'Name of the label to add when new dependencies are found'
     required: false
-    default: 'false'
+    default: 'dependencies-changed'
+
 
   
 runs:

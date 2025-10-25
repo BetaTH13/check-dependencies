@@ -31248,25 +31248,71 @@ function requireGithub () {
 
 var githubExports = requireGithub();
 
-async function upsertPrComment() {
+function createPrCommentTextActionsNeeded(filesToCheck, labelName) {
+    return `Files that need to be checked:\n` +
+        `- ${filesToCheck.join("\n- ")}\n\n` +
+        `To get rid of this message, add the following label to the PR: **${labelName}**`;
+}
+function createPrCommentTextNoActionNeeded(filesToCheck) {
+    return `All of the following files have been checked:\n` +
+        `- ${filesToCheck.join("\n- ")}`;
+}
+async function upsertPrComment(octokit, owner, repo, prNumber, body, marker = "check-dependencies-bot") {
+    const markterStart = `<!-- ${marker}:start -->`;
+    const markerEnd = `<!-- ${marker}:end -->`;
+    const fullBody = `${markterStart}\n${body}\n${markerEnd}`;
+    const { data: comments } = await octokit.rest.issues.listComments({ owner, repo, issue_number: prNumber, per_page: 100 });
+    const existingComment = comments.find((comment) => typeof comment.body === 'string' && comment.body.includes(markterStart) && comment.user?.type === 'Bot');
+    if (existingComment) {
+        await octokit.rest.issues.updateComment({ owner, repo, comment_id: existingComment.id, body: fullBody });
+    }
+    else {
+        await octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: fullBody });
+    }
 }
 async function run() {
     try {
         //get and convert inputs
         const token = coreExports.getInput("token");
-        const files = coreExports.getInput("files").split(",").map((file) => file.trim());
-        const shouldBlockPr = String(coreExports.getInput("should_block_pr") || "").toLowerCase() === "true";
+        const filesToCheck = coreExports.getInput("files_to_check").split(",").map((file) => file.trim());
+        const labelName = coreExports.getInput("label_name") || "dependencies-changed";
         //retrieve context data
         const octokit = githubExports.getOctokit(token);
         const { owner, repo } = githubExports.context.repo;
+        const { sender } = githubExports.context.payload;
+        coreExports.info(`PR triggered by user: ${sender?.login}`);
         const pr = githubExports.context.payload.pull_request;
         if (!pr) {
             coreExports.setFailed("No pull request found in the context.");
             return;
         }
+        //Get full PR content to access labels
+        const prFullContent = await octokit.rest.pulls.get({ owner, repo, pull_number: pr.number });
+        const labels = prFullContent.data.labels.map(label => label.name);
+        //Get all changed files in the PR
         const changedFiles = await octokit.rest.pulls.listFiles({ owner, repo, pull_number: pr.number });
         const changedFileNames = changedFiles.data.map(file => file.filename);
         coreExports.info(`Changed files in PR #${pr.number}: ${changedFileNames.join(", ")}`);
+        coreExports.info(`Files to check: ${filesToCheck.join(", ")}`);
+        //Determine if any of the specified files were changed.
+        const intersectingFiles = filesToCheck.filter(file => changedFileNames.some(changedFile => changedFile.includes(file)));
+        if (intersectingFiles.length == 0) {
+            coreExports.info("None of the specified files were changed in this PR.");
+            return;
+        }
+        const isLabelPresent = labels.includes(labelName);
+        //Adds or updates PR comment based on if label is present
+        if (isLabelPresent) {
+            const prComment = createPrCommentTextNoActionNeeded(intersectingFiles);
+            await upsertPrComment(octokit, owner, repo, pr.number, prComment);
+            coreExports.info(`Label "${labelName}" is present. No further action needed.`);
+            return;
+        }
+        const prComment = createPrCommentTextActionsNeeded(intersectingFiles, labelName);
+        await upsertPrComment(octokit, owner, repo, pr.number, prComment);
+        coreExports.info(`Files that need to be checked:\n- ${intersectingFiles.join("\n- ")}`);
+        coreExports.setFailed("New dependencies detected. Please review the changes.");
+        return;
     }
     catch (error) {
         coreExports.setFailed(error.message);
@@ -31277,4 +31323,4 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
     void run();
 }
 
-export { run, upsertPrComment };
+export { createPrCommentTextActionsNeeded, createPrCommentTextNoActionNeeded, run, upsertPrComment };
