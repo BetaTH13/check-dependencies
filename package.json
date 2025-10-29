@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "rollup -c rollup.config.js",
+    "commit-build": "rollup -c rollup.config.js && git add dist/index.js -f",
     "test": "vitest run --coverage"
   },
   "repository": {
