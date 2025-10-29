@@ -28,6 +28,16 @@ export async function upsertPrComment(octokit: any, owner: string, repo: string,
     }
 }
 
+export async function addNoActionRequiredComment(octokit: any, owner: string, repo: string, prNumber: number, filesToCheck: string[]) {
+    const commentBody = createPrCommentTextNoActionNeeded(filesToCheck);
+    await upsertPrComment(octokit, owner, repo, prNumber, commentBody);
+}
+
+export async function addActionRequiredComment(octokit: any, owner: string, repo: string, prNumber: number, filesToCheck: string[], labelName: string) {
+    const commentBody = createPrCommentTextActionsNeeded(filesToCheck, labelName);
+    await upsertPrComment(octokit, owner, repo, prNumber, commentBody);
+}
+
 export async function run() {
     try{
         //get and convert inputs
@@ -55,6 +65,9 @@ export async function run() {
         //Get all changed files in the PR
         const changedFiles = await octokit.rest.pulls.listFiles({owner, repo, pull_number: pr.number});
         const changedFileNames = changedFiles.data.map(file => file.filename);
+        
+        const patchesPerFile = changedFiles.data.map(file => ({filename: file.filename, patch: file.patch}));
+        core.info(`Patches per file: ${JSON.stringify(patchesPerFile, null, 2)}`);
 
         core.info(`Changed files in PR #${pr.number}: ${changedFileNames.join(", ")}`);
         core.info(`Files to check: ${filesToCheck.join(", ")}`);
@@ -63,20 +76,19 @@ export async function run() {
         const intersectingFiles = filesToCheck.filter(file => changedFileNames.some(changedFile => changedFile.includes(file)));
         if (intersectingFiles.length == 0) {
             core.info("None of the specified files were changed in this PR.");
+            addNoActionRequiredComment(octokit, owner, repo, pr.number, filesToCheck);
             return;
         }
         const isLabelPresent = labels.includes(labelName);
 
         //Adds or updates PR comment based on if label is present
         if (isLabelPresent) {
-            const prComment = createPrCommentTextNoActionNeeded(intersectingFiles);
-            await upsertPrComment(octokit, owner,  repo, pr.number, prComment);
+            addNoActionRequiredComment(octokit, owner, repo, pr.number, intersectingFiles);
             core.info(`Label "${labelName}" is present. No further action needed.`);
             return;
         }
 
-        const prComment = createPrCommentTextActionsNeeded(intersectingFiles, labelName) ;
-        await upsertPrComment(octokit, owner,  repo, pr.number, prComment);
+        addActionRequiredComment(octokit, owner, repo, pr.number, intersectingFiles, labelName);
 
         core.info(`Files that need to be checked:\n- ${intersectingFiles.join("\n- ")}`);
         core.setFailed("New dependencies detected. Please review the changes.");
