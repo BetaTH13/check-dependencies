@@ -31270,6 +31270,14 @@ async function upsertPrComment(octokit, owner, repo, prNumber, body, marker = "c
         await octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: fullBody });
     }
 }
+async function addNoActionRequiredComment(octokit, owner, repo, prNumber, filesToCheck) {
+    const commentBody = createPrCommentTextNoActionNeeded(filesToCheck);
+    await upsertPrComment(octokit, owner, repo, prNumber, commentBody);
+}
+async function addActionRequiredComment(octokit, owner, repo, prNumber, filesToCheck, labelName) {
+    const commentBody = createPrCommentTextActionsNeeded(filesToCheck, labelName);
+    await upsertPrComment(octokit, owner, repo, prNumber, commentBody);
+}
 async function run() {
     try {
         //get and convert inputs
@@ -31298,18 +31306,17 @@ async function run() {
         const intersectingFiles = filesToCheck.filter(file => changedFileNames.some(changedFile => changedFile.includes(file)));
         if (intersectingFiles.length == 0) {
             coreExports.info("None of the specified files were changed in this PR.");
+            addNoActionRequiredComment(octokit, owner, repo, pr.number, filesToCheck);
             return;
         }
         const isLabelPresent = labels.includes(labelName);
         //Adds or updates PR comment based on if label is present
         if (isLabelPresent) {
-            const prComment = createPrCommentTextNoActionNeeded(intersectingFiles);
-            await upsertPrComment(octokit, owner, repo, pr.number, prComment);
+            addNoActionRequiredComment(octokit, owner, repo, pr.number, intersectingFiles);
             coreExports.info(`Label "${labelName}" is present. No further action needed.`);
             return;
         }
-        const prComment = createPrCommentTextActionsNeeded(intersectingFiles, labelName);
-        await upsertPrComment(octokit, owner, repo, pr.number, prComment);
+        addActionRequiredComment(octokit, owner, repo, pr.number, intersectingFiles, labelName);
         coreExports.info(`Files that need to be checked:\n- ${intersectingFiles.join("\n- ")}`);
         coreExports.setFailed("New dependencies detected. Please review the changes.");
         return;
@@ -31323,4 +31330,4 @@ if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
     void run();
 }
 
-export { createPrCommentTextActionsNeeded, createPrCommentTextNoActionNeeded, run, upsertPrComment };
+export { addActionRequiredComment, addNoActionRequiredComment, createPrCommentTextActionsNeeded, createPrCommentTextNoActionNeeded, run, upsertPrComment };
